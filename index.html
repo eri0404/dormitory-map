@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Dormitory Vacancy Map</title>
+  <title>Dorm Vacancy Map</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
   <style>
     #map { height: 100vh; }
   </style>
@@ -13,37 +13,46 @@
 
 <div id="map"></div>
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script>
-  const map = L.map('map').setView([15.0784, 120.6202], 15); // Centered near PSAU
+  const map = L.map('map').setView([15.219, 120.688], 14); // Center on San Agustin
+
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
-  const csvUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQK7PW8V5cp9-01UQ5aiItXEZjBaXW6lmQtYxo6ckmc8ROBea1bXLlbAxELbVtB9sSqX1PEEt0i2eIm/pub?gid=1219013811&single=true&output=csv";
+  const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQK7PW8V5cp9-01UQ5aiItXEZjBaXW6lmQtYxo6ckmc8ROBea1bXLlbAxELbVtB9sSqX1PEEt0i2eIm/pub?gid=1219013811&single=true&output=csv';
 
   Papa.parse(csvUrl, {
     download: true,
     header: true,
     complete: function(results) {
       results.data.forEach(row => {
-        if (row.Latitude && row.Longitude) {
+        const lat = parseFloat(row['Latitude']);
+        const lng = parseFloat(row['Longitude']);
+
+        if (!isNaN(lat) && !isNaN(lng)) {
           const popupContent = `
-            <b>${row["Dorm Name"]}</b><br>
-            Shared Room for Girls: ${row["Shared Room for Girls"]}<br>
-            Shared Room for Boys: ${row["Shared Room for Boys"]}<br>
-            Solo Room for Girls: ${row["Solo Room for Girls"]}<br>
-            Solo Room for Boys: ${row["Solo Room for Boys"]}<br>
-            Last Updated: ${row["Last Updated"]}
+            <strong>${row['Dorm Name']}</strong><br>
+            Shared Room for Girls: ${row['Shared Room for Girls']}<br>
+            Shared Room for Boys: ${row['Shared Room for Boys']}<br>
+            Solo Room for Girls: ${row['Solo Room for Girls']}<br>
+            Solo Room for Boys: ${row['Solo Room for Boys']}<br>
+            Last Updated: ${row['Last Updated']}
           `;
-          L.marker([parseFloat(row.Latitude), parseFloat(row.Longitude)])
+          L.marker([lng, lat])
             .addTo(map)
             .bindPopup(popupContent);
+        } else {
+          console.warn('Invalid coordinates for row:', row);
         }
       });
     }
   });
 </script>
+
 </body>
 </html>
+
+
