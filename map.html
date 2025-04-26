@@ -1,98 +1,117 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Dorm Vacancy Map</title>
+  <title>Dormitory Map with Layers and Distance</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
-
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <!-- Leaflet Control Layers CSS (for layers control) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-layers/dist/leaflet-control-layers.css" />
+  
   <style>
-    #map { height: 100vh; }
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
   </style>
 </head>
 <body>
 
 <div id="map"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<!-- Leaflet Google Layer -->
+<script src="https://unpkg.com/leaflet-gridlayer-googlemutant"></script>
 
 <script>
-  const map = L.map('map').setView([15.219, 120.688], 14);
+// Initialize the map and set the center to PSAU (update coordinates for PSAU gate if necessary)
+const map = L.map('map').setView([15.1503, 120.6562], 15); // Example center: PSAU area
 
-  const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
+// Add OpenStreetMap baselayer
+const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors'
+});
 
-  const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, etc.'
+// Add Google Satellite Layer
+const googleSatLayer = L.gridLayer.googleMutant({
+  type: 'satellite'
+});
+
+// Define PSAU Gate Location (Change this to the correct GPS of PSAU Gate)
+const psauGate = L.latLng(15.1503, 120.6562);
+
+// Add Layers Control
+L.control.layers({
+  "OpenStreetMap": osmLayer,
+  "Google Satellite": googleSatLayer
+}).addTo(map);
+
+// Add PSAU Gate marker
+L.marker(psauGate).addTo(map)
+  .bindPopup("<b>PSAU Gate</b><br>PSAU Main Entrance");
+
+// Fetch CSV data
+const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQRwwQ1M6kEM44Jgb1t5gjBEhlUPa8D_SdgOT9aN4RSfzJM7v_vvk2dQVRw0Qwe0-wZaqQDrTmupDQg/pub?output=csv'; // Replace this with your actual CSV URL
+
+fetch(csvUrl)
+  .then(response => response.text())
+  .then(csvData => {
+    const data = parseCSV(csvData);
+    addDormitoryMarkers(data);
+  })
+  .catch(error => console.error('Error fetching CSV data:', error));
+
+// Parse CSV data into an array of objects
+function parseCSV(csv) {
+  const rows = csv.split('\n');
+  const headers = rows[0].split(','); // Extract the column headers
+  const dormitories = [];
+
+  rows.slice(1).forEach(row => {
+    const values = row.split(',');
+    const dorm = {};
+    headers.forEach((header, i) => {
+      dorm[header] = values[i];
+    });
+    dormitories.push(dorm);
   });
+  return dormitories;
+}
 
-  const baseMaps = {
-    "Street Map": street,
-    "Satellite View": satellite
-  };
-
-  L.control.layers(baseMaps).addTo(map);
-
-  const psaGate = [15.2193, 120.6859];
-
-  function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  }
-
-  const csvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQK7PW8V5cp9-01UQ5aiItXEZjBaXW6lmQtYxo6ckmc8ROBea1bXLlbAxELbVtB9sSqX1PEEt0i2eIm/pub?gid=1219013811&single=true&output=csv';
-
-  Papa.parse(csvUrl, {
-    download: true,
-    header: true,
-    complete: function(results) {
-      results.data.forEach(row => {
-        const lat = parseFloat(row['Latitude']);
-        const lng = parseFloat(row['Longitude']);
-
-        if (!isNaN(lat) && !isNaN(lng)) {
-          const distance = getDistance(psaGate[0], psaGate[1], lat, lng).toFixed(2);
-
-          const popupContent = `
-            <strong>${row['Dorm Name']}</strong><br>
-            Shared Room for Girls: ${row['Shared Room for Girls']}<br>
-            Shared Room for Boys: ${row['Shared Room for Boys']}<br>
-            Solo Room for Girls: ${row['Solo Room for Girls']}<br>
-            Solo Room for Boys: ${row['Solo Room for Boys']}<br>
-            Last Updated: ${row['Last Updated']}<br>
-            Distance from PSAU Gate: ${distance} km
-          `;
-
-          L.marker([lng, lat])
-            .addTo(map)
-            .bindPopup(popupContent);
-
-          L.Routing.control({
-            waypoints: [
-              L.latLng(psaGate[0], psaGate[1]),
-              L.latLng(lat, lng)
-            ],
-            routeWhileDragging: false,
-            show: false,
-            addWaypoints: false,
-            draggableWaypoints: false,
-            createMarker: () => null
-          }).addTo(map);
-        }
-      });
+// Add dormitory markers to the map
+function addDormitoryMarkers(dormitories) {
+  dormitories.forEach(dorm => {
+    // Skip empty data (we'll only add dorms that have latitude, longitude, and dorm name)
+    if (!dorm['Latitude'] || !dorm['Longitude'] || !dorm['Dorm Name']) {
+      return;
     }
+
+    const dormLocation = [parseFloat(dorm['Latitude']), parseFloat(dorm['Longitude'])];
+    const marker = L.marker(dormLocation)
+      .addTo(map)
+      .bindPopup(generatePopupContent(dorm));
+
+    // Calculate and show distance from PSAU Gate
+    const distance = psauGate.distanceTo(dormLocation); // Distance in meters
+    marker.bindPopup(marker.getPopup().getContent() + `<br><br>Distance from PSAU Gate: ${Math.round(distance)} meters`);
   });
+}
+
+// Generate popup content for dormitory
+function generatePopupContent(dorm) {
+  let popupContent = `<b>${dorm['Dorm Name']}</b><br>`;
+  if (dorm['Contact Number']) popupContent += `Contact: ${dorm['Contact Number']}<br>`;
+  if (dorm['Available Bed Space - for GIRLS']) popupContent += `Girls Bed: ${dorm['Available Bed Space - for GIRLS']}<br>`;
+  if (dorm['Available Bed Space - for BOYS']) popupContent += `Boys Bed: ${dorm['Available Bed Space - for BOYS']}<br>`;
+  if (dorm['Available Solo Room - for GIRLS']) popupContent += `Solo Room for Girls: ${dorm['Available Solo Room - for GIRLS']}<br>`;
+  if (dorm['Available Solo Room - for BOYS']) popupContent += `Solo Room for Boys: ${dorm['Available Solo Room - for BOYS']}<br>`;
+  if (dorm['Available Shared Room - for GIRLS']) popupContent += `Shared Room for Girls: ${dorm['Available Shared Room - for GIRLS']}<br>`;
+  if (dorm['Available Shared Room - for BOYS']) popupContent += `Shared Room for Boys: ${dorm['Available Shared Room - for BOYS']}<br>`;
+  return popupContent;
+}
 </script>
 
 </body>
